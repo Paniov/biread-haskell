@@ -2,9 +2,9 @@ name:                biread-haskell
 version:             0.1.0.0
 github:              "githubuser/biread-haskell"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2019 Author name here"
+author:              "Andriy Panov"
+maintainer:          "paniov@example.com"
+copyright:           "2019 Paniov"
 
 extra-source-files:
 - README.md
