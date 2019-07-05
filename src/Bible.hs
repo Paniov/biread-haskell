@@ -1,22 +1,47 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Bible 
   ( Book 
   , Chapter
+  , lookupBook
   ) where
 
-data Chapter = Chapter { chapter :: Int
-                       , verses :: Int
-                       , parts :: [Int] 
-                       } deriving (Show)
+data Chapter = Chapter
+    { chapterChapter :: Int
+    , chapterVerses :: Int
+    , chapterParts :: [Int] 
+    } deriving (Show)
 
-data Book = Book { title :: String
-                 , group :: String
-                 , chapters :: [Chapter] 
-                 } deriving (Show)
+data Book = Book
+    { bookTitle :: String
+    , bookGroup :: String
+    , bookChapters :: [Chapter] 
+    } deriving (Show)
+
+data Quote = Quote
+    { quoteTitle :: String
+    , quoteChapter :: Int
+    , quoteVerseStart :: Int
+    , quoteVerseEnd :: Int
+    } deriving (Show)
+
+getQuotes :: String -> Chapter -> [Quote]
+getQuotes title (Chapter { chapterChapter=ch, chapterVerses=vs, chapterParts=[]}) = 
+  [Quote { quoteTitle=title, quoteChapter=ch, quoteVerseStart=1, quoteVerseEnd=vs }]
+
+getQuotes title (Chapter { chapterChapter=ch, chapterVerses=vs, chapterParts=(parts:[])}) = 
+  [ Quote { quoteTitle=title, quoteChapter=ch, quoteVerseStart = 1, quoteVerseEnd = parts-1 }
+  , Quote { quoteTitle=title, quoteChapter=ch, quoteVerseStart = parts, quoteVerseEnd = vs }
+  ]
+
+quoteStartEnd :: Int -> Int -> [Int] -> [(Int, Int)]
+quoteStartEnd start end [] = [(start, end)]
+quoteStartEnd start end (p:parts) = (start, p-1) : (boo p end parts)
 
 bookOf :: String -> String -> [Chapter] -> Book
-bookOf t g p = Book { title=t, group=g, chapters=p }
+bookOf t g p = Book { bookTitle=t, bookGroup=g, bookChapters=p }
 
 matthewChapters :: [Chapter]
 matthewChapters = 
@@ -67,11 +92,11 @@ booksNT =
 lookupBook :: [Book] -> String -> Maybe Book
 lookupBook [] _ = Nothing
 lookupBook (b:[]) value
-  | title b == value = Just b
+  | bookTitle b == value = Just b
   | otherwise = Nothing
 
 lookupBook (b:bs) value
-  | title b == value = Just b
+  | bookTitle b == value = Just b
   | otherwise = lookupBook bs value
 
 
