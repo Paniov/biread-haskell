@@ -27,18 +27,32 @@ data Quote = Quote
     , quoteVerseEnd :: Int
     } deriving (Show)
 
-getQuotes :: String -> Chapter -> [Quote]
-getQuotes title (Chapter { chapterChapter=ch, chapterVerses=vs, chapterParts=[]}) = 
-  [Quote { quoteTitle=title, quoteChapter=ch, quoteVerseStart=1, quoteVerseEnd=vs }]
-
-getQuotes title (Chapter { chapterChapter=ch, chapterVerses=vs, chapterParts=(parts:[])}) = 
-  [ Quote { quoteTitle=title, quoteChapter=ch, quoteVerseStart = 1, quoteVerseEnd = parts-1 }
-  , Quote { quoteTitle=title, quoteChapter=ch, quoteVerseStart = parts, quoteVerseEnd = vs }
-  ]
-
 quoteStartEnd :: Int -> Int -> [Int] -> [(Int, Int)]
 quoteStartEnd start end [] = [(start, end)]
-quoteStartEnd start end (p:parts) = (start, p-1) : (boo p end parts)
+quoteStartEnd start end (p:parts) = (start, p-1) : (quoteStartEnd p end parts)
+
+getChapterQuotes :: String -> Chapter -> [Quote]
+getChapterQuotes title (Chapter { chapterChapter=ch, chapterVerses=vs, chapterParts=ps}) = 
+  map (\tpl -> Quote { quoteTitle=title, quoteChapter=ch, quoteVerseStart=(fst tpl), quoteVerseEnd=(snd tpl) }) $ quoteStartEnd 1 vs ps
+
+getBookQuotes :: Book -> [Quote]
+getBookQuotes (Book { bookTitle=t, bookGroup=gr, bookChapters=chps }) = concat . map (getChapterQuotes t) $ chps
+
+getQuotes :: [Book] -> [Quote]
+getQuotes = concat . map getBookQuotes
+
+glewQuotes :: Quote -> Quote -> Quote
+glewQuotes (Quote { quoteTitle=tL, quoteChapter=chL, quoteVerseStart=startL, quoteVerseEnd=endL }) (Quote { quoteTitle=tR, quoteChapter=chR, quoteVerseStart=startR, quoteVerseEnd=endR }) = 
+  Quote { quoteTitle=tL, quoteChapter=chL, quoteVerseStart=startL, quoteVerseEnd=endR }
+
+glewQuotesAt :: Int -> [Quote] -> [Quote]
+glewQuotesAt dayOfYear qs = (\(left, right) -> (init left) ++ [glewQuotes (last left) (head right)] ++ (tail right)) $ (splitAt dayOfYear qs)
+
+getQuotesNormalYear :: [Book] -> [Quote]
+getQuotesNormalYear = getQuotes
+
+getQuotesLeapYear :: Int -> [Book] -> [Quote]
+getQuotesLeapYear dayOfYear = (glewQuotesAt dayOfYear) . getQuotes
 
 bookOf :: String -> String -> [Chapter] -> Book
 bookOf t g p = Book { bookTitle=t, bookGroup=g, bookChapters=p }
