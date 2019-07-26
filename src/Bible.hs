@@ -7,33 +7,90 @@ module Bible
   , Chapter
   , lookupBook
   ) where
+  
+import Control.Lens
 
 data Chapter = Chapter
     { chapterChapter :: Int
     , chapterVerses :: Int
     , chapterParts :: [Int] 
     } deriving (Show)
+makeLenses ''Chapter
 
 data Book = Book
     { bookTitle :: String
     , bookGroup :: String
     , bookChapters :: [Chapter] 
     } deriving (Show)
+makeLenses ''Book
+
+data QuoteEdge = QuoteEdge
+    { _quoteEdgeTitle :: String
+    , _quoteEdgeChapter :: Int
+    , _quoteEdgeVerse :: Int
+    } deriving (Show)
+makeLenses ''QuoteEdge
 
 data Quote = Quote
-    { quoteTitle :: String
-    , quoteChapter :: Int
-    , quoteVerseStart :: Int
-    , quoteVerseEnd :: Int
+    { _leftEdge :: QuoteEdge
+    , _rightEdge :: QuoteEdge
     } deriving (Show)
+makeLenses ''Quote
+
+------------------ QuoteEdge Lenses ----------------------------
+qeTitleL :: Quote -> String
+qeTitleL = view (leftEdge . quoteEdgeTitle)
+
+setQeTitleL :: String -> Quote -> Quote
+setQeTitleL = set (leftEdge . quoteEdgeTitle)
+
+qeTitleR :: Quote -> String
+qeTitleR = view (rightEdge . quoteEdgeTitle)
+
+setQeTitleR :: String -> Quote -> Quote
+setQeTitleR = set (rightEdge . quoteEdgeTitle)
+
+qeChapterL :: Quote -> Int
+qeChapterL = view (leftEdge . quoteEdgeChapter)
+
+setQeChapterL :: Int -> Quote -> Quote
+setQeChapterL = set (leftEdge . quoteEdgeChapter)
+
+qeChapterR :: Quote -> Int
+qeChapterR = view (rightEdge . quoteEdgeChapter)
+
+setQeChapterR :: Int -> Quote -> Quote
+setQeChapterR = set (rightEdge . quoteEdgeChapter)
+
+qeVerseL :: Quote -> Int
+qeVerseL = view (leftEdge . quoteEdgeVerse)
+
+setQeVerseL :: Int -> Quote -> Quote
+setQeVerseL = set (leftEdge . quoteEdgeVerse)
+
+qeVerseR :: Quote -> Int
+qeVerseR = view (rightEdge . quoteEdgeVerse)
+
+setQeVerseR :: Int -> Quote -> Quote
+setQeVerseR = set (rightEdge . quoteEdgeVerse)
+
+qeTitleEq :: Quote -> Quote -> Bool
+qeTitleEq q1 q2 = qeTitleL q1 == qeTitleR q2
+
+qeChapterEq :: Quote -> Quote -> Bool
+qeChapterEq q1 q2 = qeChapterL q1 == qeChapterR q2
+-------------------------------------------------------------
+
+quoteEdgeOf :: String -> Int -> Int -> QuoteEdge
+quoteEdgeOf title chapter verse = QuoteEdge { _quoteEdgeTitle=title, _quoteEdgeChapter=chapter, _quoteEdgeVerse=verse }
 
 quoteStartEnd :: Int -> Int -> [Int] -> [(Int, Int)]
 quoteStartEnd start end [] = [(start, end)]
 quoteStartEnd start end (p:parts) = (start, p-1) : (quoteStartEnd p end parts)
 
 getChapterQuotes :: String -> Chapter -> [Quote]
-getChapterQuotes title (Chapter { chapterChapter=ch, chapterVerses=vs, chapterParts=ps}) = 
-  map (\tpl -> Quote { quoteTitle=title, quoteChapter=ch, quoteVerseStart=(fst tpl), quoteVerseEnd=(snd tpl) }) $ quoteStartEnd 1 vs ps
+getChapterQuotes title (Chapter { chapterChapter=ch, chapterVerses=vs, chapterParts=ps}) = map (quoteOf $ quoteEdgeOf title ch) $ quoteStartEnd 1 vs ps
+  where quoteOf f = \(vsL, vsR) -> Quote { _leftEdge = f vsL, _rightEdge = f vsR }
 
 getBookQuotes :: Book -> [Quote]
 getBookQuotes (Book { bookTitle=t, bookGroup=gr, bookChapters=chps }) = concat . map (getChapterQuotes t) $ chps
@@ -41,9 +98,15 @@ getBookQuotes (Book { bookTitle=t, bookGroup=gr, bookChapters=chps }) = concat .
 getQuotes :: [Book] -> [Quote]
 getQuotes = concat . map getBookQuotes
 
+settersQ :: 
+settersQ = (setQeTitleR . qeTitleR) q2 . (setQeChapterR . qeChapterR) q2 . (setQeVerseR . qeVerseR)
+
 glewQuotes :: Quote -> Quote -> Quote
-glewQuotes (Quote { quoteTitle=tL, quoteChapter=chL, quoteVerseStart=startL, quoteVerseEnd=endL }) (Quote { quoteTitle=tR, quoteChapter=chR, quoteVerseStart=startR, quoteVerseEnd=endR }) = 
-  Quote { quoteTitle=tL, quoteChapter=chL, quoteVerseStart=startL, quoteVerseEnd=endR }
+glewQuotes q1 q2 
+  | qeTitleEq q1 q2 && qeChapterEq q1 q2 = setQeVerseR (qeVerseR q2) q1
+  | qeTitleEq q1 q2 && (not $ qeChapterEq q1 q2) = (setQeChapterR (qeChapterR q2)) . (setQeVerseR (qeVerseR q2)) $ q1
+  | otherwise = (settersQ q2) $ q1
+  -- | otherwise = (setQeTitleR (qeTitleR q2)) . (setQeChapterR (qeChapterR q2)) . (setQeVerseR (qeVerseR q2)) $ q1
 
 glewQuotesAt :: Int -> [Quote] -> [Quote]
 glewQuotesAt dayOfYear qs = (\(left, right) -> (init left) ++ [glewQuotes (last left) (head right)] ++ (tail right)) $ (splitAt dayOfYear qs)
@@ -112,6 +175,3 @@ lookupBook (b:[]) value
 lookupBook (b:bs) value
   | bookTitle b == value = Just b
   | otherwise = lookupBook bs value
-
-
-
