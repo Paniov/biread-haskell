@@ -12,23 +12,23 @@ module Bible
 import Control.Lens
 
 data Chapter = Chapter
-    { chapterChapter :: Int
-    , chapterVerses :: Int
-    , chapterParts :: [Int] 
+    { _chChapter :: Int
+    , _chVerses :: Int
+    , _chParts :: [Int] 
     } deriving (Show)
 makeLenses ''Chapter
 
 data Book = Book
-    { bookTitle :: String
-    , bookGroup :: String
-    , bookChapters :: [Chapter] 
+    { _bTitle :: String
+    , _bGroup :: String
+    , _bChapters :: [Chapter] 
     } deriving (Show)
 makeLenses ''Book
 
 data QuoteEdge = QuoteEdge
-    { _quoteEdgeTitle :: String
-    , _quoteEdgeChapter :: Int
-    , _quoteEdgeVerse :: Int
+    { _qeTitle :: String
+    , _qeChapter :: Int
+    , _qeVerse :: Int
     } deriving (Show)
 makeLenses ''QuoteEdge
 
@@ -39,83 +39,115 @@ data Quote = Quote
 makeLenses ''Quote
 
 ------------------ QuoteEdge Lenses ----------------------------
-qeTitleL :: Quote -> String
-qeTitleL = view (leftEdge . quoteEdgeTitle)
+
+--------- Title set ----------
+leftTitltePath :: Functor f => (String -> f String) -> Quote -> f Quote
+leftTitltePath = leftEdge . qeTitle
+
+getQeTitleL :: Quote -> String
+getQeTitleL = view leftTitltePath
 
 setQeTitleL :: String -> Quote -> Quote
-setQeTitleL = set (leftEdge . quoteEdgeTitle)
+setQeTitleL = set leftTitltePath
 
-qeTitleR :: Quote -> String
-qeTitleR = view (rightEdge . quoteEdgeTitle)
+rightTitltePath :: Functor f => (String -> f String) -> Quote -> f Quote
+rightTitltePath = rightEdge . qeTitle
+
+getQeTitleR :: Quote -> String
+getQeTitleR = view rightTitltePath
 
 setQeTitleR :: String -> Quote -> Quote
-setQeTitleR = set (rightEdge . quoteEdgeTitle)
+setQeTitleR = set rightTitltePath
 
-qeChapterL :: Quote -> Int
-qeChapterL = view (leftEdge . quoteEdgeChapter)
+mergeQeTitleR :: Quote -> Quote -> Quote
+mergeQeTitleR = setQeTitleR . getQeTitleR
+
+--------- Chapter set ----------
+
+leftChapterPath :: Functor f => (Int -> f Int) -> Quote -> f Quote
+leftChapterPath = leftEdge . qeChapter
+
+getQeChapterL :: Quote -> Int
+getQeChapterL = view leftChapterPath
 
 setQeChapterL :: Int -> Quote -> Quote
-setQeChapterL = set (leftEdge . quoteEdgeChapter)
+setQeChapterL = set leftChapterPath
 
-qeChapterR :: Quote -> Int
-qeChapterR = view (rightEdge . quoteEdgeChapter)
+rightChapterPath :: Functor f => (Int -> f Int) -> Quote -> f Quote
+rightChapterPath = rightEdge . qeChapter
+
+getQeChapterR :: Quote -> Int
+getQeChapterR = view rightChapterPath
 
 setQeChapterR :: Int -> Quote -> Quote
-setQeChapterR = set (rightEdge . quoteEdgeChapter)
+setQeChapterR = set rightChapterPath
 
-qeVerseL :: Quote -> Int
-qeVerseL = view (leftEdge . quoteEdgeVerse)
+mergeQeChapterR :: Quote -> Quote -> Quote
+mergeQeChapterR = setQeChapterR . getQeChapterR
+
+--------- Verse set -----------
+
+leftVersePath :: Functor f => (Int -> f Int) -> Quote -> f Quote
+leftVersePath = leftEdge . qeVerse
+
+getQeVerseL :: Quote -> Int
+getQeVerseL = view leftVersePath
 
 setQeVerseL :: Int -> Quote -> Quote
-setQeVerseL = set (leftEdge . quoteEdgeVerse)
+setQeVerseL = set leftVersePath
 
-qeVerseR :: Quote -> Int
-qeVerseR = view (rightEdge . quoteEdgeVerse)
+rightVersePath :: Functor f => (Int -> f Int) -> Quote -> f Quote
+rightVersePath = rightEdge . qeVerse
+
+getQeVerseR :: Quote -> Int
+getQeVerseR = view rightVersePath
 
 setQeVerseR :: Int -> Quote -> Quote
-setQeVerseR = set (rightEdge . quoteEdgeVerse)
+setQeVerseR = set rightVersePath
+
+mergeQeVerseR :: Quote -> Quote -> Quote
+mergeQeVerseR = setQeVerseR . getQeVerseR
 
 qeTitleEq :: Quote -> Quote -> Bool
-qeTitleEq q1 q2 = qeTitleL q1 == qeTitleR q2
+qeTitleEq q1 q2 = getQeTitleL q1 == getQeTitleR q2
 
 qeChapterEq :: Quote -> Quote -> Bool
-qeChapterEq q1 q2 = qeChapterL q1 == qeChapterR q2
--------------------------------------------------------------
+qeChapterEq q1 q2 = getQeChapterL q1 == getQeChapterR q2
 
-quoteEdgeOf :: String -> Int -> Int -> QuoteEdge
-quoteEdgeOf title chapter verse = QuoteEdge { _quoteEdgeTitle=title, _quoteEdgeChapter=chapter, _quoteEdgeVerse=verse }
+mergeQuoteOf :: Foldable t => a -> t (a -> b -> b) -> b -> b
+mergeQuoteOf = \q2 -> foldr ((.).($ q2)) id
+
+settersQeRightVs :: [(Quote -> Quote -> Quote)]
+settersQeRightVs = [mergeQeVerseR]
+
+settersQeRightChVs :: [(Quote -> Quote -> Quote)]
+settersQeRightChVs = [mergeQeChapterR, mergeQeVerseR]
+
+settersQeRight :: [(Quote -> Quote -> Quote)]
+settersQeRight = [mergeQeTitleR, mergeQeChapterR, mergeQeVerseR]
+
+-------------------------------------------------------------
 
 quoteStartEnd :: Int -> Int -> [Int] -> [(Int, Int)]
 quoteStartEnd start end [] = [(start, end)]
 quoteStartEnd start end (p:parts) = (start, p-1) : (quoteStartEnd p end parts)
 
 getChapterQuotes :: String -> Chapter -> [Quote]
-getChapterQuotes title (Chapter { chapterChapter=ch, chapterVerses=vs, chapterParts=ps}) = map (quoteOf $ quoteEdgeOf title ch) $ quoteStartEnd 1 vs ps
-  where quoteOf f = \(vsL, vsR) -> Quote { _leftEdge = f vsL, _rightEdge = f vsR }
+getChapterQuotes title ch = map (quoteOf $ QuoteEdge title (ch^.chChapter)) $ quoteStartEnd 1 (ch^.chVerses) (ch^.chParts)
+  where quoteOf f = \(vsL, vsR) -> Quote (f vsL) (f vsR)
 
 getBookQuotes :: Book -> [Quote]
-getBookQuotes (Book { bookTitle=t, bookGroup=gr, bookChapters=chps }) = concat . map (getChapterQuotes t) $ chps
+getBookQuotes book = concat . map (getChapterQuotes $ book^.bTitle ) $ book^.bChapters 
 
 getQuotes :: [Book] -> [Quote]
 getQuotes = concat . map getBookQuotes
 
--- TODO add type definition and impl
-composeQuote :: Int -> []
--- *Bible> foo = \x -> foldr ((.).($x)) id
--- *Bible> boo = foo 2 [((+) . (1+)), ((+) . (1+))]
--- *Bible> boo 5
-
--- TODO add type definition and impl
-composeQuoteAllLeftARighrB :: a -> a -> a 
-composeQuoteAllLeftARighrB = *
-
 glewQuotes :: Quote -> Quote -> Quote
-glewQuotes q1 q2 
-  | qeTitleEq q1 q2 && qeChapterEq q1 q2 = setQeVerseR (qeVerseR q2) q1
-  | qeTitleEq q1 q2 && (not $ qeChapterEq q1 q2) = (setQeChapterR (qeChapterR q2)) . (setQeVerseR (qeVerseR q2)) $ q1
-  -- | otherwise = (setQeTitleR (qeTitleR q2)) . (setQeChapterR (qeChapterR q2)) . (setQeVerseR (qeVerseR q2)) $ q1
-  | otherwise = ((setQeTitleR . qeTitleR) q2 . (setQeChapterR . qeChapterR ) q2 . (setQeVerseR . qeVerseR) q2) $ q1
-  -- | otherwise = (settersQ q2) $ q1
+glewQuotes q1 q2 = mergeQuoteOf q2 quoteSetters q1 where
+  quoteSetters
+    | qeTitleEq q1 q2 && qeChapterEq q1 q2 = settersQeRightVs
+    | qeTitleEq q1 q2 && (not $ qeChapterEq q1 q2) = settersQeRightChVs
+    | otherwise = settersQeRight
 
 glewQuotesAt :: Int -> [Quote] -> [Quote]
 glewQuotesAt dayOfYear qs = (\(left, right) -> (init left) ++ [glewQuotes (last left) (head right)] ++ (tail right)) $ (splitAt dayOfYear qs)
@@ -125,9 +157,6 @@ getQuotesNormalYear = getQuotes
 
 getQuotesLeapYear :: Int -> [Book] -> [Quote]
 getQuotesLeapYear dayOfYear = (glewQuotesAt dayOfYear) . getQuotes
-
-bookOf :: String -> String -> [Chapter] -> Book
-bookOf t g p = Book { bookTitle=t, bookGroup=g, bookChapters=p }
 
 matthewChapters :: [Chapter]
 matthewChapters = 
@@ -169,18 +198,18 @@ markChapters =
 
 booksNT :: [Book]
 booksNT = 
-  [ bookOf "Matthew" "Gospel" matthewChapters
-  , bookOf "Mark"    "Gospel" markChapters
-  , bookOf "Luke"    "Gospel" markChapters
-  , bookOf "John"    "Gospel" markChapters
+  [ Book "Matthew" "Gospel" matthewChapters
+  , Book "Mark"    "Gospel" markChapters
+  , Book "Luke"    "Gospel" markChapters
+  , Book "John"    "Gospel" markChapters
   ]
 
 lookupBook :: [Book] -> String -> Maybe Book
 lookupBook [] _ = Nothing
 lookupBook (b:[]) value
-  | bookTitle b == value = Just b
+  | _bTitle b == value = Just b
   | otherwise = Nothing
 
 lookupBook (b:bs) value
-  | bookTitle b == value = Just b
+  | _bTitle b == value = Just b
   | otherwise = lookupBook bs value
