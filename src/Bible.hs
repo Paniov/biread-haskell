@@ -1,6 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Bible 
   ( Book 
@@ -98,15 +99,23 @@ getBookQuotes (Book { bookTitle=t, bookGroup=gr, bookChapters=chps }) = concat .
 getQuotes :: [Book] -> [Quote]
 getQuotes = concat . map getBookQuotes
 
-settersQ :: 
-settersQ = (setQeTitleR . qeTitleR) q2 . (setQeChapterR . qeChapterR) q2 . (setQeVerseR . qeVerseR)
+-- TODO add type definition and impl
+composeQuote :: Int -> []
+-- *Bible> foo = \x -> foldr ((.).($x)) id
+-- *Bible> boo = foo 2 [((+) . (1+)), ((+) . (1+))]
+-- *Bible> boo 5
+
+-- TODO add type definition and impl
+composeQuoteAllLeftARighrB :: a -> a -> a 
+composeQuoteAllLeftARighrB = *
 
 glewQuotes :: Quote -> Quote -> Quote
 glewQuotes q1 q2 
   | qeTitleEq q1 q2 && qeChapterEq q1 q2 = setQeVerseR (qeVerseR q2) q1
   | qeTitleEq q1 q2 && (not $ qeChapterEq q1 q2) = (setQeChapterR (qeChapterR q2)) . (setQeVerseR (qeVerseR q2)) $ q1
-  | otherwise = (settersQ q2) $ q1
   -- | otherwise = (setQeTitleR (qeTitleR q2)) . (setQeChapterR (qeChapterR q2)) . (setQeVerseR (qeVerseR q2)) $ q1
+  | otherwise = ((setQeTitleR . qeTitleR) q2 . (setQeChapterR . qeChapterR ) q2 . (setQeVerseR . qeVerseR) q2) $ q1
+  -- | otherwise = (settersQ q2) $ q1
 
 glewQuotesAt :: Int -> [Quote] -> [Quote]
 glewQuotesAt dayOfYear qs = (\(left, right) -> (init left) ++ [glewQuotes (last left) (head right)] ++ (tail right)) $ (splitAt dayOfYear qs)
